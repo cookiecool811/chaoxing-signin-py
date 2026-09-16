@@ -50,7 +50,7 @@ def load_config() -> dict:
             "phone": env_phone,
             "password": env_password,
             "preset_addresses": preset,
-            "delay": int(os.environ.get("CHAOXING_DELAY", "0")),
+            "delay": int(os.environ.get("CHAOXING_DELAY") or "0"),
         }
 
     # 本地调试模式

@@ -1,0 +1,31 @@
+name: chaoxing-signin
+
+on:
+  schedule:
+    # 每 5 分钟跑一次（UTC 时间，GitHub 实际触发可能有几分钟延迟）
+    - cron: "*/5 * * * *"
+  workflow_dispatch: {}   # 允许在 GitHub 页面手动点按钮触发
+
+jobs:
+  signin:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: 拉取代码
+        uses: actions/checkout@v4
+
+      - name: 设置 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: 安装依赖
+        run: pip install -r requirements.txt
+
+      - name: 执行签到
+        run: python run_once.py
+        env:
+          CHAOXING_PHONE: ${{ secrets.CHAOXING_PHONE }}
+          CHAOXING_PASSWORD: ${{ secrets.CHAOXING_PASSWORD }}
+          CHAOXING_ADDRESS: ${{ secrets.CHAOXING_ADDRESS }}
+          CHAOXING_DELAY: ${{ secrets.CHAOXING_DELAY }}

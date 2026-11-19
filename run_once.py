@@ -1,6 +1,6 @@
 """
 单次运行：登录 → 查课程 → 发现签到就签 → 退出。
-供 GitHub Actions 每 5 分钟定时触发一次使用。
+供 GitHub Actions 定时触发一次使用。
 
 配置优先级：
 1. 环境变量（GitHub Actions 注入）—— 推荐
@@ -8,7 +8,6 @@
 """
 from __future__ import annotations
 
-import json
 import os
 import sys
 
@@ -18,7 +17,7 @@ from chaoxing.activity import (
     pre_sign,
     traverse_course_activity,
 )
-from chaoxing.notify import send_email
+from chaoxing.notify import pushplus_send, send_email
 from chaoxing.sign import (
     general_sign,
     get_object_id_from_pan,
@@ -26,6 +25,10 @@ from chaoxing.sign import (
     photo_sign,
 )
 from chaoxing.user import get_account_info, get_courses, user_login
+
+
+# 服务端返回“已签到过了”属于正常情况，不算失败
+_ALREADY_SIGNED = ("您已签到过了", "你已签到过了")
 
 
 def load_config() -> dict:
@@ -88,7 +91,14 @@ def do_sign(cookies: dict, name: str, activity: dict, preset_address: list, dela
     return None
 
 
-def main() -> None:
+def _push(title: str, content: str) -> None:
+    """可选 PushPlus 微信推送，配置 PUSHPLUS_TOKEN 环境变量后生效。"""
+    token = os.environ.get("PUSHPLUS_TOKEN", "")
+    if token:
+        pushplus_send(token, title, content)
+
+
+def run() -> None:
     cfg = load_config()
 
     if not cfg["phone"] or not cfg["password"]:
@@ -98,7 +108,8 @@ def main() -> None:
     print(f"[run_once] 登录 {cfg['phone']}")
     result = user_login(cfg["phone"], cfg["password"])
     if result == "AuthFailed":
-        print("[run_once] 登录失败")
+        print("[run_once] 登录失败（可能触发验证码/风控，或账号密码有误）")
+        _push("超星签到失败", "登录失败：可能触发验证码/风控，或账号密码有误")
         sys.exit(1)
     params = result
 
@@ -109,8 +120,12 @@ def main() -> None:
         name = ""
 
     courses = get_courses(params["_uid"], params["_d"], params["vc3"])
-    if courses in ("AuthFailed", "NoCourse"):
-        print("[run_once] 无课程或凭证失效")
+    if courses == "AuthFailed":
+        print("[run_once] 凭证失效，本次签到终止")
+        _push("超星签到失败", "凭证失效，本次签到终止")
+        sys.exit(1)
+    if courses == "NoCourse":
+        print("[run_once] 无课程可查")
         sys.exit(0)
 
     activity = traverse_course_activity(courses, params)
@@ -126,6 +141,14 @@ def main() -> None:
     )
     print(f"[run_once] 结果：{sign_result}")
 
+    # 已签到过了视为正常；其余非成功结果按失败处理并以非零退出
+    already = any(word in (sign_result or "") for word in _ALREADY_SIGNED)
+    success = bool(sign_result) and ("成功" in sign_result or already)
+    if not success:
+        _push("超星签到失败", f"活动：{activity.get('name', '')}；结果：{sign_result}")
+        sys.exit(1)
+    _push("超星签到成功", f"活动：{activity.get('name', '')}；结果：{sign_result}")
+
     # 邮件推送（可选，本地配置）
     try:
         import user_config
@@ -137,6 +160,15 @@ def main() -> None:
             )
     except Exception:
         pass
+
+
+def main() -> None:
+    try:
+        run()
+    except Exception as e:
+        # 网络异常等不再让进程无声崩溃，打印明确原因并标记失败
+        print(f"[run_once] 运行异常：{type(e).__name__}: {e}")
+        sys.exit(1)
 
 
 if __name__ == "__main__":

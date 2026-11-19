@@ -87,23 +87,27 @@ def pre_sign(activity: dict, cookies: dict) -> None:
     )
     print("[预签]已请求")
 
-    # analysis
+    # analysis：页面结构若调整，找不到标记时跳过该步骤，不阻断后续签到
     r1 = request(
         f"{config.ANALYSIS}?vs=1&DB_STRATEGY=RANDOM&aid={activity['activeId']}",
         headers={"Cookie": cookie_serialize(cookies), "User-Agent": "Mozilla/5.0"},
     )
-    code = r1.data
-    code_start = code.find("code='+'") + 8
-    code = code[code_start:]
-    code_end = code.find("'")
-    code = code[:code_end]
-
-    # analysis2
-    r2 = request(
-        f"{config.ANALYSIS2}?DB_STRATEGY=RANDOM&code={code}",
-        headers={"Cookie": cookie_serialize(cookies), "User-Agent": "Mozilla/5.0"},
-    )
-    print(f"analysis 请求结果：{r2.data}")
+    marker = "code='+'"
+    mark_pos = r1.data.find(marker)
+    if mark_pos != -1:
+        code_start = mark_pos + len(marker)
+        code = r1.data[code_start:]
+        code_end = code.find("'")
+        if code_end != -1:
+            code = code[:code_end]
+            # analysis2
+            r2 = request(
+                f"{config.ANALYSIS2}?DB_STRATEGY=RANDOM&code={code}",
+                headers={"Cookie": cookie_serialize(cookies), "User-Agent": "Mozilla/5.0"},
+            )
+            print(f"analysis 请求结果：{r2.data}")
+    else:
+        print("[预签] analysis 标记未找到，跳过该步骤")
 
     time.sleep(0.5)
 

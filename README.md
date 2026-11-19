@@ -27,7 +27,7 @@ pip install -r requirements.txt
 
 ## 本地使用
 
-编辑 `user_config.py`，填写：
+复制 `user_config.example.py` 为 `user_config.py`（该文件已被 `.gitignore` 忽略，不会泄露账号信息），填写：
 
 ```python
 PHONE = "你的手机号"
@@ -74,14 +74,20 @@ git push -u origin main
 | `CHAOXING_PASSWORD` | 学习通密码 | `yourpassword` |
 | `CHAOXING_ADDRESS` | 位置（经纬度/地址），多个用分号分隔 | `108.705,34.330,陕西省咸阳市` |
 | `CHAOXING_DELAY` | 签到延时秒数（可选） | `0` |
+| `PUSHPLUS_TOKEN` | PushPlus 微信推送 token（可选，失败/成功会推送） | `xxxxxxxx` |
 
 ### 3. 启用 Actions
 
 进入仓库 **Actions** 标签页，手动触发一次 `chaoxing-signin` workflow 测试。
 
-配置完成后，GitHub 会每 5 分钟自动运行一次 `run_once.py`，发现签到活动即自动完成，无需人工干预。
+配置完成后，GitHub 会每 10 分钟自动运行一次 `run_once.py`（错开整点高峰以减少排队丢跑），发现签到活动即自动完成，无需人工干预。
 
 > 经纬度获取：<https://api.map.baidu.com/lbsapi/getpoint/index.html>
+
+## 注意事项
+
+- **公开仓库 60 天无活动，定时任务会被 GitHub 自动禁用且不发通知**。本项目内置 `keepalive` 工作流，会在满 40 天无提交时自动保活；也可在 Actions 页面手动点 **Enable workflow** 恢复。
+- 切勿把含真实账号密码的 `user_config.py` 提交到公开仓库。若曾提交，密码会永久保留在 git 历史中，应立即修改学习通密码。
 
 ## 签到类型说明
 
@@ -102,10 +108,11 @@ chaoxing-signin-py/
 ├── monitor.py           # 本地持续监听
 ├── run_once.py          # 单次签到（GitHub Actions 调用）
 ├── config.py            # API 地址与常量
-├── user_config.py       # 个人配置（本地使用）
+├── user_config.example.py  # 个人配置模板（复制为 user_config.py）
 ├── requirements.txt
 ├── .github/workflows/
-│   └── signin.yml       # GitHub Actions 定时任务
+│   ├── signin.yml       # GitHub Actions 定时签到
+│   └── keepalive.yml    # 定时保活，防止 60 天自动禁用
 └── chaoxing/
     ├── client.py        # HTTP 请求封装
     ├── storage.py       # 本地凭证存储

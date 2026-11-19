@@ -3,3 +3,11 @@ __pycache__/
 *.pyc
 data/storage.json
 .DS_Store
+
+# 个人配置含真实账号密码，禁止提交
+user_config.py
+.keepalive
+
+# IDE 配置
+.idea/
+.vscode/

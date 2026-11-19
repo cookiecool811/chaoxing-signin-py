@@ -54,29 +54,9 @@ def user_login(uname: str, password: str) -> dict | str:
         print("登录失败")
         return "AuthFailed"
 
-    # 从 Set-Cookie 解析字段
-    set_cookies = result.headers.get("Set-Cookie", "")
-    cookies_map: dict[str, str] = {}
-    # requests 可能把多个 cookie 合并到一个字符串里，也可能在 values 列表
-    raw_cookies = []
-    if isinstance(set_cookies, str):
-        raw_cookies = [set_cookies]
-    else:
-        raw_cookies = list(set_cookies)
-
-    for line in raw_cookies:
-        for piece in line.split(","):
-            piece = piece.strip()
-            if "=" not in piece:
-                continue
-            eq = piece.find("=")
-            semi = piece.find(";")
-            if semi == -1:
-                semi = len(piece)
-            name = piece[:eq].strip()
-            value = piece[eq + 1: semi].strip()
-            if name:
-                cookies_map[name] = value
+    # 直接使用 requests 解析好的 cookie 字典，
+    # 避免手动拆分 Set-Cookie 时被 Expires 中的逗号干扰
+    cookies_map = result.cookies
 
     print("登录成功")
     params = {
@@ -107,9 +87,11 @@ def get_courses(uid: str, d: str, vc3: str) -> list | str:
             "User-Agent": "Mozilla/5.0",
         },
         data=formdata,
+        allow_redirects=False,
     )
 
-    if result.status_code == 302:
+    # 不跟随重定向，302 即代表鉴权失效（跟随重定向时永远拿不到 302）
+    if result.status_code in (301, 302):
         print("身份过期，请重新登录！")
         return "AuthFailed"
 

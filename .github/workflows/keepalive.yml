@@ -1,0 +1,36 @@
+name: keepalive
+
+# 每周一运行一次，在满 60 天自动禁用前制造仓库活动，重置 60 天计时
+on:
+  schedule:
+    - cron: "17 2 * * 1"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  keepalive:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: 拉取代码
+        uses: actions/checkout@v4
+
+      - name: 超过40天无活动则自动提交保活
+        run: |
+          LAST=$(git log -1 --format=%ct)
+          NOW=$(date +%s)
+          AGE=$(( (NOW - LAST) / 86400 ))
+          echo "距上次提交 ${AGE} 天"
+          if [ "$AGE" -ge 40 ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            date -u > .keepalive
+            git add .keepalive
+            git commit -m "chore: keepalive (reset 60-day inactivity timer)"
+            git push
+            echo "已自动提交保活"
+          else
+            echo "未达40天，无需保活"
+          fi
